@@ -3,13 +3,18 @@ import os
 import pefile
 from capstone import *
 from groq import Groq
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+from tkinter import filedialog, messagebox
 import threading
 
 # Groq API Configuration
 GROQ_API_KEY = "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"
 GROQ_MODEL = "llama-3.3-70b-versatile"
+
+# CustomTkinter Theme configuration
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("green") # Neon Green Matrix/Cyber vibe!
 
 # Mock/Welcome Data for initialization
 MOCK_BLOCKS = [
@@ -58,30 +63,27 @@ MOCK_BLOCKS = [
     }
 ]
 
-class NovaREAppTk:
+class NovaREAppCustomTk:
     def __init__(self, root):
         self.root = root
-        self.root.title("NovaRE AI - Winlator Optimized Static Analyzer")
-        self.root.geometry("1280x750")
+        self.root.title("NovaRE AI - Premium CustomTkinter Static Analyzer")
+        self.root.geometry("1300, 780")
         
-        # Application States
+        # States
         self.current_blocks = MOCK_BLOCKS
         self.current_file_path = ""
         self.chat_history = []
         
-        # Color Scheme (Cyberpunk Dark Mode)
+        # Color definitions for Vector drawing
         self.bg_color = "#0B0D11"
-        self.pane_color = "#0F121A"
-        self.border_color = "#1F2430"
+        self.pane_color = "#161920"
+        self.border_color = "#2D313E"
         self.text_color = "#E2E8F0"
-        self.accent_green = "#00FF66"
-        self.accent_red = "#FF4A6B"
-        self.accent_blue = "#00C0FF"
-        
-        self.root.configure(bg=self.bg_color)
+        self.accent_green = "#22C55E"
+        self.accent_red = "#EF4444"
+        self.accent_blue = "#3B82F6"
         
         self.setup_menu()
-        self.setup_styles()
         self.build_ui()
         self.draw_graph()
 
@@ -104,82 +106,74 @@ class NovaREAppTk:
         
         self.root.config(menu=menubar)
 
-    def setup_styles(self):
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure(".", background=self.pane_color, foreground=self.text_color, borderwidth=0)
-        style.configure("TLabel", background=self.pane_color, foreground="#8F93A2", font=("Consolas", 9, "bold"))
-        style.configure("TCombobox", fieldbackground=self.bg_color, background=self.pane_color, foreground=self.text_color, arrowcolor=self.accent_green)
-        style.configure("TButton", background="#161A26", foreground=self.accent_green, bordercolor=self.accent_green, font=("Consolas", 10, "bold"))
-        style.map("TButton", background=[("active", self.accent_green)], foreground=[("active", self.bg_color)])
-
     def build_ui(self):
-        # Master Grid Layout
-        self.root.columnconfigure(0, weight=1, minsize=250) # Left panel
-        self.root.columnconfigure(1, weight=3, minsize=500) # Center graph
-        self.root.columnconfigure(2, weight=2, minsize=350) # Right AI chat
+        # Configure Grid Layout
+        self.root.columnconfigure(0, weight=1, minsize=260) # Left
+        self.root.columnconfigure(1, weight=3, minsize=550) # Center
+        self.root.columnconfigure(2, weight=2, minsize=370) # Right
         self.root.rowconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=0) # Status bar
+        self.root.rowconfigure(1, weight=0)
 
-        # LEFT PANEL: Meta & Selectors
-        left_pane = tk.Frame(self.root, bg=self.pane_color, bd=1, relief="solid", highlightbackground=self.border_color)
-        left_pane.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        # LEFT PANEL: Meta info & Block List (CustomTkinter Frame)
+        left_pane = ctk.CTkFrame(self.root, fg_color=self.pane_color, corner_radius=10, border_color=self.border_color, border_width=1)
+        left_pane.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        tk.Label(left_pane, text="TARGET ANALYSIS FILE", bg=self.pane_color, fg="#8F93A2", font=("Consolas", 9, "bold")).pack(anchor="w", padx=10, pady=(10, 2))
-        self.file_label = tk.Label(left_pane, text="No Target Loaded (Demo Graph Mode)", bg=self.pane_color, fg=self.accent_green, font=("Consolas", 9), wraplength=220, justify="left")
-        self.file_label.pack(anchor="w", padx=10, pady=2)
+        ctk.CTkLabel(left_pane, text="TARGET ANALYSIS FILE", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(15, 2))
+        self.file_label = ctk.CTkLabel(left_pane, text="No Target Loaded\n(Using Demo Graph)", font=ctk.CTkFont(family="Consolas", size=10), text_color=self.accent_green, justify="left", wraplength=230)
+        self.file_label.pack(anchor="w", padx=15, pady=2)
         
-        tk.Label(left_pane, text="ANALYSIS DEPTH", bg=self.pane_color, fg="#8F93A2", font=("Consolas", 9, "bold")).pack(anchor="w", padx=10, pady=(15, 2))
-        self.depth_selector = ttk.Combobox(left_pane, values=["1 KB (Recommended)", "4 KB (Medium)", "16 KB (Deep)"], state="readonly")
-        self.depth_selector.current(0)
-        self.depth_selector.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(left_pane, text="ANALYSIS DEPTH", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(20, 2))
+        self.depth_selector = ctk.CTkComboBox(left_pane, values=["1 KB (Recommended)", "4 KB (Medium)", "16 KB (Deep)"], font=ctk.CTkFont(family="Consolas", size=11))
+        self.depth_selector.set("1 KB (Recommended)")
+        self.depth_selector.pack(fill="x", padx=15, pady=2)
         
-        tk.Label(left_pane, text="EXTRACTED SYMBOL BLOCKS", bg=self.pane_color, fg="#8F93A2", font=("Consolas", 9, "bold")).pack(anchor="w", padx=10, pady=(15, 2))
-        self.block_list = tk.Listbox(left_pane, bg=self.bg_color, fg=self.text_color, bd=1, relief="solid", highlightcolor=self.accent_green, selectbackground="#1B2130", selectforeground=self.accent_green, font=("Consolas", 9))
-        self.block_list.pack(fill="both", expand=True, padx=10, pady=5)
+        ctk.CTkLabel(left_pane, text="EXTRACTED SYMBOL BLOCKS", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(20, 2))
+        
+        # Standard Listbox packaged nicely for seamless selection handling
+        self.block_list = tk.Listbox(left_pane, bg=self.bg_color, fg=self.text_color, bd=1, relief="solid", highlightcolor=self.accent_green, selectbackground="#1B2130", selectforeground=self.accent_green, font=("Consolas", 10))
+        self.block_list.pack(fill="both", expand=True, padx=15, pady=10)
         self.block_list.bind("<<ListboxSelect>>", self.jump_to_block)
 
-        # CENTER PANEL: Canvas Graph View
-        center_pane = tk.Frame(self.root, bg=self.bg_color, bd=1, relief="solid", highlightbackground=self.border_color)
-        center_pane.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        # CENTER PANEL: Canvas (Software-Render Graph View - Winlator Safe)
+        center_pane = ctk.CTkFrame(self.root, fg_color=self.bg_color, corner_radius=10, border_color=self.border_color, border_width=1)
+        center_pane.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         
-        # Lightweight Zoom/Pan Canvas
         self.canvas = tk.Canvas(center_pane, bg=self.bg_color, bd=0, highlightthickness=0)
-        self.canvas.pack(fill="both", expand=True)
+        self.canvas.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # Drag to Pan support (Perfect for touchscreens / Winlator mice)
+        # Custom Pan/Drag bindings for mouse/touch translation
         self.canvas.bind("<ButtonPress-1>", self.start_pan)
         self.canvas.bind("<B1-Motion>", self.pan)
+
+        # RIGHT PANEL: AI Conversation Center
+        right_pane = ctk.CTkFrame(self.root, fg_color=self.pane_color, corner_radius=10, border_color=self.border_color, border_width=1)
+        right_pane.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
         
-        # RIGHT PANEL: AI Portal
-        right_pane = tk.Frame(self.root, bg=self.pane_color, bd=1, relief="solid", highlightbackground=self.border_color)
-        right_pane.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
+        ctk.CTkLabel(right_pane, text="NOVARE LLAMA-3.3 INTELLIGENT AI", font=ctk.CTkFont(family="Consolas", size=12, weight="bold"), text_color=self.accent_blue).pack(anchor="w", padx=15, pady=(15, 5))
         
-        tk.Label(right_pane, text="NOVARE LLAMA-3.3 INTELLIGENT AI", bg=self.pane_color, fg=self.accent_blue, font=("Consolas", 10, "bold")).pack(anchor="w", padx=10, pady=(10, 5))
-        
-        self.chat_area = scrolledtext.ScrolledText(right_pane, bg=self.bg_color, fg=self.text_color, bd=1, relief="solid", font=("Consolas", 9), wrap="word")
-        self.chat_area.pack(fill="both", expand=True, padx=10, pady=5)
-        self.chat_area.insert(tk.END, "Welcome to NovaRE AI! Drag or open a binary to analyze it using AI-powered Control Flow Analysis.\n\n")
+        # Rich Text Chat Box
+        self.chat_area = ctk.CTkTextbox(right_pane, fg_color=self.bg_color, font=ctk.CTkFont(family="Consolas", size=11), text_color=self.text_color, border_color=self.border_color, border_width=1, wrap="word")
+        self.chat_area.pack(fill="both", expand=True, padx=15, pady=5)
+        self.chat_area.insert(tk.END, "Welcome to NovaRE CustomTkinter Edition!\nAsk me anything about binary engineering or click Deep Audit below.\n\n")
         self.chat_area.configure(state="disabled")
         
-        chat_input_frame = tk.Frame(right_pane, bg=self.pane_color)
-        chat_input_frame.pack(fill="x", padx=10, pady=5)
+        chat_input_frame = ctk.CTkFrame(right_pane, fg_color="transparent")
+        chat_input_frame.pack(fill="x", padx=15, pady=10)
         
-        self.chat_input = tk.Entry(chat_input_frame, bg=self.bg_color, fg="#FFFFFF", insertbackground=self.accent_green, bd=1, relief="solid", font=("Consolas", 10))
-        self.chat_input.pack(side="left", fill="x", expand=True, ipady=4)
+        self.chat_input = ctk.CTkEntry(chat_input_frame, placeholder_text="Ask logic explanation...", font=ctk.CTkFont(family="Consolas", size=11), fg_color=self.bg_color, border_color=self.border_color)
+        self.chat_input.pack(side="left", fill="x", expand=True, ipady=3)
         self.chat_input.bind("<Return>", lambda e: self.send_chat_message())
         
-        send_btn = ttk.Button(chat_input_frame, text="Send", command=self.send_chat_message)
-        send_btn.pack(side="right", padx=(5, 0))
+        send_btn = ctk.CTkButton(chat_input_frame, text="Send", width=70, font=ctk.CTkFont(family="Consolas", size=11, weight="bold"), command=self.send_chat_message)
+        send_btn.pack(side="right", padx=(8, 0))
         
-        self.audit_btn = ttk.Button(right_pane, text="🚀 Run Deep Cyber Audit (AI)", command=self.run_ai_audit)
-        self.audit_btn.pack(fill="x", padx=10, pady=5)
+        self.audit_btn = ctk.CTkButton(right_pane, text="🚀 Run Deep Cyber Audit (AI)", font=ctk.CTkFont(family="Consolas", size=11, weight="bold"), fg_color="#10B981", hover_color="#059669", text_color="#FFFFFF", command=self.run_ai_audit)
+        self.audit_btn.pack(fill="x", padx=15, pady=(0, 15))
 
         # STATUS BAR
-        self.status_label = tk.Label(self.root, text="Engine Idle. Ready to parse x86_64 target files.", bg=self.pane_color, fg="#8F93A2", font=("Consolas", 8), anchor="w", padx=10, pady=4)
-        self.status_label.grid(row=1, column=0, columnspan=3, sticky="we")
+        self.status_label = ctk.CTkLabel(self.root, text="Engine Idle. Ready to parse x86_64 target files.", font=ctk.CTkFont(family="Consolas", size=10), text_color="#8F93A2", fg_color=self.pane_color, anchor="w")
+        self.status_label.grid(row=1, column=0, columnspan=3, sticky="we", ipady=4)
 
-    # Drag to pan canvas events
     def start_pan(self, event):
         self.canvas.scan_mark(event.x, event.y)
 
@@ -190,7 +184,7 @@ class NovaREAppTk:
         file_path = filedialog.askopenfilename(title="Open Executable File")
         if file_path:
             self.current_file_path = file_path
-            self.file_label.config(text=os.path.basename(file_path))
+            self.file_label.configure(text=os.path.basename(file_path))
             self.update_status(f"Disassembling {file_path}...")
             
             try:
@@ -212,8 +206,8 @@ class NovaREAppTk:
         except Exception:
             entry_offset = 0
 
-        depth_map = {0: 1024, 1: 4096, 2: 16384}
-        chunk_size = depth_map.get(self.depth_selector.current(), 1024)
+        depth_map = {"1 KB (Recommended)": 1024, "4 KB (Medium)": 4096, "16 KB (Deep)": 16384}
+        chunk_size = depth_map.get(self.depth_selector.get(), 1024)
         
         with open(file_path, 'rb') as f:
             f.seek(entry_offset)
@@ -307,7 +301,6 @@ class NovaREAppTk:
         if not self.current_blocks:
             return
 
-        # Simple hierarchical layout engine
         levels = {}
         def compute_depth(node_id, current_level, visited):
             if node_id in visited:
@@ -329,11 +322,10 @@ class NovaREAppTk:
         gap_x = 60
         gap_y = 180
 
-        # Calculate coordinates on canvas
         for lvl, b_ids in level_groups.items():
             count = len(b_ids)
             total_w = count * node_width + (count - 1) * gap_x
-            offset_x = 400 - (total_w / 2) # Center around x=400
+            offset_x = 400 - (total_w / 2)
             
             for idx, b_id in enumerate(b_ids):
                 x = offset_x + idx * (node_width + gap_x)
@@ -342,8 +334,108 @@ class NovaREAppTk:
 
         self.block_coords = {}
         
-        # Render Nodes (Blocks)
+        # Render Blocks on Vector Canvas
         for b in self.current_blocks:
             b_id = b["id"]
             x, y = pos_map[b_id]
-            self.block_coords[b_id] = (x, y, node_width, 100) # Fallba
+            
+            self.block_list.insert(tk.END, b["title"])
+            
+            text_lines = [b["title"]]
+            for addr, mnem, op in b["instructions"]:
+                text_lines.append(f"0x{addr:08X}: {mnem} {op}")
+            
+            node_height = len(text_lines) * 16 + 20
+            self.block_coords[b_id] = (x, y, node_width, node_height)
+            
+            # Rounded Block outline using canvas polygons
+            self.draw_rounded_rect(x, y, x + node_width, y + node_height, 8, fill="#161920", outline=self.border_color, width=2, tags=f"node_{b_id}")
+            # Header block
+            self.draw_rounded_rect(x + 2, y + 2, x + node_width - 2, y + 22, 6, fill="#202530", outline="", tags=f"node_{b_id}")
+            
+            # Header Text
+            self.canvas.create_text(x + 12, y + 12, text=b["title"], fill=self.accent_green, font=("Consolas", 10, "bold"), anchor="w")
+            
+            # Instruction print loop
+            line_y = y + 36
+            for addr, mnem, op in b["instructions"]:
+                inst_text = f"0x{addr:08X}  {mnem:<6} {op}"
+                self.canvas.create_text(x + 12, line_y, text=inst_text, fill=self.text_color, font=("Consolas", 9), anchor="w")
+                line_y += 16
+
+        # Render Flowlines between blocks
+        for b in self.current_blocks:
+            b_id = b["id"]
+            if b_id not in self.block_coords:
+                continue
+            x1, y1, w1, h1 = self.block_coords[b_id]
+            start_pt = (x1 + w1 / 2, y1 + h1)
+            
+            for target_id, link_type in b["next_blocks"]:
+                if target_id in self.block_coords:
+                    x2, y2, w2, h2 = self.block_coords[target_id]
+                    end_pt = (x2 + w2 / 2, y2)
+                    
+                    color = "#5C6370"
+                    if link_type == "true":
+                        color = self.accent_green
+                    elif link_type == "false":
+                        color = self.accent_red
+                    elif link_type == "unconditional":
+                        color = self.accent_blue
+                    
+                    # Draw connection line with arrow head pointing to children
+                    self.canvas.create_line(start_pt[0], start_pt[1], end_pt[0], end_pt[1], fill=color, width=2, arrow=tk.LAST, smooth=True)
+
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+    # Helper function to render rounded blocks without native Windows API dependencies
+    def draw_rounded_rect(self, x1, y1, x2, y2, r, **kwargs):
+        points = [
+            x1+r, y1, x1+r, y1, x2-r, y1, x2-r, y1, x2, y1, x2, y1+r, x2, y1+r,
+            x2, y2-r, x2, y2-r, x2, y2, x2-r, y2, x2-r, y2, x1+r, y2, x1+r, y2,
+            x1, y2, x1, y2-r, x1, y2-r, x1, y1+r, x1, y1+r, x1, y1
+        ]
+        return self.canvas.create_polygon(points, **kwargs, smooth=True)
+
+    def jump_to_block(self, event):
+        selection = self.block_list.curselection()
+        if selection:
+            idx = selection[0]
+            title = self.block_list.get(idx)
+            for b_id, b in enumerate(self.current_blocks):
+                if b["title"] == title:
+                    x, y, w, h = self.block_coords[b_id]
+                    self.canvas.xview_moveto((x - 100) / self.canvas.winfo_width())
+                    self.canvas.yview_moveto((y - 100) / self.canvas.winfo_height())
+                    
+                    # Target highlight
+                    self.canvas.itemconfig(f"node_{b_id}", outline=self.accent_green)
+                    for other_id in range(len(self.current_blocks)):
+                        if other_id != b_id:
+                            self.canvas.itemconfig(f"node_{other_id}", outline=self.border_color)
+                    break
+
+    def build_ai_context(self):
+        context = "Current Code Control-Flow Architecture:\n"
+        for b in self.current_blocks:
+            context += f"## {b['title']}\n"
+            for addr, mnem, op in b['instructions']:
+                context += f"0x{addr:08X}: {mnem} {op}\n"
+            context += f"Connections: {b['next_blocks']}\n\n"
+        return context
+
+    def send_chat_message(self):
+        user_msg = self.chat_input.get().strip()
+        if not user_msg:
+            return
+        
+        self.chat_input.delete(0, tk.END)
+        self.append_chat("User", user_msg)
+        self.update_status("AI is processing disassembly context and query...")
+
+        system_instruction = (
+            "You are NovaRE, a sovereign AI Reverse Engineering assistant. "
+            "You have direct system telemetry access to the decompiled basic blocks control flow graph (CFG). "
+            "Answer users technical questions, explain blocks, variables, stack frames, decryption loops, and overall logic accurately. "
+            "Analyze user request context and keep 
