@@ -4,14 +4,15 @@ import pefile
 from capstone import *
 from groq import Groq
 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+# PyQt5 importları yapıldı
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QSplitter, QTextEdit, QLineEdit, 
                              QPushButton, QFileDialog, QListWidget, QLabel, 
                              QGraphicsView, QGraphicsScene, QGraphicsItem, 
                              QMenuBar, QMenu, QStatusBar, QMessageBox, QFrame,
                              QComboBox)
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QFont, QPainterPath
-from PyQt6.QtCore import Qt, QRectF, QPointF, QThread, pyqtSignal
+from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QPainterPath
+from PyQt5.QtCore import Qt, QRectF, QPointF, QThread, pyqtSignal
 
 # Groq API Configuration
 GROQ_API_KEY = "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"
@@ -94,8 +95,9 @@ class NodeItem(QGraphicsItem):
         self.title = title
         self.instructions = instructions
         self.setPos(x, y)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+        # PyQt5 uyumlu flag tanımlamaları yapıldı
+        self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
         
         self.width = 300
         self.line_height = 18
@@ -107,7 +109,7 @@ class NodeItem(QGraphicsItem):
         return self.rect
 
     def paint(self, painter, option, widget):
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing)
         
         # Node Box Styling
         brush = QBrush(QColor("#161920"))
@@ -122,15 +124,16 @@ class NodeItem(QGraphicsItem):
         # Node Title Header
         header_rect = QRectF(0, 0, self.width, self.header_height)
         painter.setBrush(QBrush(QColor("#202530")))
-        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setPen(Qt.NoPen)
         painter.drawRoundedRect(header_rect, 8, 8)
         painter.drawRect(QRectF(0, self.header_height - 5, self.width, 5))  # Corner correction
         
         # Header Text
         painter.setPen(QColor("#00FF66"))
-        font = QFont("Consolas", 10, QFont.Weight.Bold)
+        font = QFont("Consolas", 10, QFont.Bold)
         painter.setFont(font)
-        painter.drawText(header_rect.adjusted(12, 0, -12, 0), Qt.AlignmentFlag.AlignVCenter, self.title)
+        # PyQt5 uyumlu alignment tanımlaması yapıldı
+        painter.drawText(header_rect.adjusted(12, 0, -12, 0), Qt.AlignVertical_Mask, self.title)
         
         # Instructions Syntax Highlighting
         y_offset = self.header_height + 8
@@ -164,7 +167,7 @@ class EdgeItem(QGraphicsItem):
         return QRectF(self.start_item.pos(), self.end_item.pos()).normalized().adjusted(-40, -40, 40, 40)
 
     def paint(self, painter, option, widget):
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing)
         
         start_rect = self.start_item.rect
         end_rect = self.end_item.rect
@@ -197,13 +200,14 @@ class EdgeItem(QGraphicsItem):
 class GraphView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setRenderHint(QPainter.TextAntialiasing)
+        # PyQt5 uyumlu enum değerleri uygulandı
+        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
         self.setBackgroundBrush(QBrush(QColor("#0B0D11")))
-        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setFrameShape(QFrame.NoFrame)
 
     def wheelEvent(self, event):
         factor = 1.15
@@ -249,7 +253,8 @@ class NovaREApp(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        # PyQt5 uyumlu Horizontal Splitter
+        main_splitter = QSplitter(Qt.Horizontal)
         main_layout.addWidget(main_splitter)
 
         # LEFT PANE: Directory & Metadata Information
@@ -338,7 +343,6 @@ class NovaREApp(QMainWindow):
     def parse_and_disassemble(self, file_path):
         # Extract entrypoint or fallbacks
         entry_offset = 0
-        pe_extracted = False
         try:
             pe = pefile.PE(file_path)
             entry_offset = pe.OPTIONAL_HEADER.AddressOfEntryPoint
@@ -346,7 +350,6 @@ class NovaREApp(QMainWindow):
                 if section.VirtualAddress <= entry_offset < section.VirtualAddress + section.Misc_VirtualSize:
                     entry_offset = section.PointerToRawData + (entry_offset - section.VirtualAddress)
                     break
-            pe_extracted = True
         except Exception:
             entry_offset = 0
 
@@ -517,4 +520,4 @@ class NovaREApp(QMainWindow):
         for b_id, node in self.node_items.items():
             if node.title == title:
                 self.graph_view.centerOn(node)
-       
+      
