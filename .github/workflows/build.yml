@@ -26,8 +26,9 @@ jobs:
 
     - name: Compile and Bundle Code using PyInstaller
       run: |
-        # CustomTkinter'ın tema ve JSON dosyalarını EXE içine eksiksiz gömmek için collect-all ekledik.
-        pyinstaller --noconsole --onefile --collect-all customtkinter --name="NovaRE_AI" main.py
+        # Saf web mimarisi sayesinde tcl/tk veya PyQt DLL'leri toplamaya gerek yoktur.
+        # Bu sayede sadece terminal arkasında çalışan hafif ve stabil bir EXE derlenir.
+        pyinstaller --onefile --name="NovaRE_AI" main.py
 
     - name: Archive Executable Build Artifacts
       uses: actions/upload-artifact@v4
