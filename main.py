@@ -13,9 +13,8 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 
 app = Flask(__name__)
 
-# Embedded Cyberpunk HTML/CSS/JS Template
-HTML_TEMPLATE = """
-<!DOCTYPE html>
+# Embedded Cyberpunk HTML/CSS/JS Template (Tüm kaçış karakteri hataları temizlendi)
+HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -62,7 +61,6 @@ HTML_TEMPLATE = """
             flex: 1;
             overflow: hidden;
         }
-        /* Sidebar Left */
         .sidebar-left {
             width: 280px;
             background-color: var(--pane-color);
@@ -124,7 +122,6 @@ HTML_TEMPLATE = """
             background-color: #1B2130;
             color: var(--accent-green);
         }
-        /* Center Graph View */
         .center-graph {
             flex: 1;
             overflow: auto;
@@ -173,7 +170,6 @@ HTML_TEMPLATE = """
         .flow-false { color: var(--accent-red); }
         .flow-unconditional { color: var(--accent-blue); }
 
-        /* Sidebar Right - AI Chat */
         .sidebar-right {
             width: 380px;
             background-color: var(--pane-color);
@@ -261,7 +257,6 @@ HTML_TEMPLATE = """
     </header>
 
     <div class="main-container">
-        <!-- Left Side -->
         <div class="sidebar-left">
             <div class="panel-title">Target Analysis File</div>
             <div class="file-upload-box" onclick="document.getElementById('file-input').click()">
@@ -277,17 +272,11 @@ HTML_TEMPLATE = """
             </select>
 
             <div class="panel-title">Extracted Symbol Blocks</div>
-            <ul class="block-list" id="block-list-container">
-                <!-- Blocks loaded dynamically -->
-            </ul>
+            <ul class="block-list" id="block-list-container"></ul>
         </div>
 
-        <!-- Center Graph Area -->
-        <div class="center-graph" id="graph-view-container">
-            <!-- Dynamic CFG Nodes -->
-        </div>
+        <div class="center-graph" id="graph-view-container"></div>
 
-        <!-- Right AI Chat Panel -->
         <div class="sidebar-right">
             <div class="panel-title" style="color: var(--accent-blue);">AI Conversation Portal</div>
             <div class="chat-area" id="chat-box">
@@ -308,18 +297,18 @@ HTML_TEMPLATE = """
     </footer>
 
     <script>
-        let currentBlocks = [];
+        var currentBlocks = [];
 
         function uploadFile() {
-            const fileInput = document.getElementById('file-input');
-            const depth = document.getElementById('depth-select').value;
-            const file = fileInput.files[0];
+            var fileInput = document.getElementById('file-input');
+            var depth = document.getElementById('depth-select').value;
+            var file = fileInput.files[0];
             if (!file) return;
 
             document.getElementById('file-label-text').innerText = file.name;
             document.getElementById('status-text').innerText = "Disassembling " + file.name + "...";
 
-            const formData = new FormData();
+            var formData = new FormData();
             formData.append('file', file);
             formData.append('depth', depth);
 
@@ -327,8 +316,8 @@ HTML_TEMPLATE = """
                 method: 'POST',
                 body: formData
             })
-            .then(res => res.json())
-            .then(data => {
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
                 if (data.error) {
                     alert(data.error);
                     document.getElementById('status-text').innerText = "Decompilation failed.";
@@ -338,59 +327,56 @@ HTML_TEMPLATE = """
                     document.getElementById('status-text').innerText = "Successfully parsed blocks.";
                 }
             })
-            .catch(err => {
+            .catch(function(err) {
                 console.error(err);
                 document.getElementById('status-text').innerText = "Network upload error.";
             });
         }
 
         function renderGraph(blocks) {
-            const listContainer = document.getElementById('block-list-container');
-            const graphContainer = document.getElementById('graph-view-container');
+            var listContainer = document.getElementById('block-list-container');
+            var graphContainer = document.getElementById('graph-view-container');
             listContainer.innerHTML = "";
             graphContainer.innerHTML = "";
 
-            blocks.forEach((block, idx) => {
-                // List item left sidebar
-                const li = document.createElement('li');
+            blocks.forEach(function(block, idx) {
+                var li = document.createElement('li');
                 li.innerText = block.title;
-                li.onclick = () => {
-                    document.getElementById(`node-card-${block.id}`).scrollIntoView({ behavior: 'smooth' });
+                li.onclick = function() {
+                    document.getElementById("node-card-" + block.id).scrollIntoView({ behavior: 'smooth' });
                 };
                 listContainer.appendChild(li);
 
-                // Connector Indicators above block if not the first node
                 if (idx > 0) {
-                    const prevBlock = blocks[idx - 1];
-                    let linkType = "fallthrough";
-                    prevBlock.next_blocks.forEach(link => {
+                    var prevBlock = blocks[idx - 1];
+                    var linkType = "fallthrough";
+                    prevBlock.next_blocks.forEach(function(link) {
                         if (link[0] === block.id) {
                             linkType = link[1];
                         }
                     });
 
-                    const flowDiv = document.createElement('div');
-                    flowDiv.className = `flow-indicator flow-${linkType}`;
-                    flowDiv.innerText = `▼ Link: [${linkType.toUpperCase()}]`;
+                    var flowDiv = document.createElement('div');
+                    flowDiv.className = "flow-indicator flow-" + linkType;
+                    flowDiv.innerText = "▼ Link: [" + linkType.toUpperCase() + "]";
                     graphContainer.appendChild(flowDiv);
                 }
 
-                // Render block card
-                const card = document.createElement('div');
+                var card = document.createElement('div');
                 card.className = "node-card";
-                card.id = `node-card-${block.id}`;
+                card.id = "node-card-" + block.id;
 
-                const header = document.createElement('div');
+                var header = document.createElement('div');
                 header.className = "node-header";
                 header.innerText = block.title;
                 card.appendChild(header);
 
-                const body = document.createElement('div');
+                var body = document.createElement('div');
                 body.className = "node-body";
                 
-                let instText = "";
-                block.instructions.forEach(inst => {
-                    instText += `0x${inst[0].toString(16).toUpperCase()}:  ${inst[1].padEnd(8, ' ')} ${inst[2]}\\n`;
+                var instText = "";
+                block.instructions.forEach(function(inst) {
+                    instText += "0x" + inst[0].toString(16).toUpperCase() + ":  " + inst[1] + " " + inst[2] + "\\n";
                 });
                 body.innerText = instText;
                 card.appendChild(body);
@@ -400,20 +386,27 @@ HTML_TEMPLATE = """
         }
 
         function appendChatMsg(sender, text) {
-            const chatBox = document.getElementById('chat-box');
-            const roleClass = sender === "User" ? "msg-role-User" : (sender === "NovaRE AI" ? "msg-role-AI" : "msg-role-System");
+            var chatBox = document.getElementById('chat-box');
+            var roleClass = "msg-role-System";
+            if (sender === "User") {
+                roleClass = "msg-role-User";
+            } else if (sender === "NovaRE AI") {
+                roleClass = "msg-role-AI";
+            }
             
-            const msgDiv = document.createElement('div');
+            var msgDiv = document.createElement('div');
             msgDiv.className = "chat-msg";
-            msgDiv.innerHTML = `<span class="${roleClass}">${sender}:</span> ${text.replace(/\\n/g, '<br>')}`;
+            
+            var formattedText = text.split('\\n').join('<br>');
+            msgDiv.innerHTML = "<span class='" + roleClass + "'>" + sender + ":</span> " + formattedText;
             
             chatBox.appendChild(msgDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function sendChatMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
+            var input = document.getElementById('chat-input');
+            var message = input.value.strip ? input.value.strip() : input.value.trim();
             if (!message) return;
 
             input.value = "";
@@ -425,12 +418,12 @@ HTML_TEMPLATE = """
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: message, blocks: currentBlocks })
             })
-            .then(res => res.json())
-            .then(data => {
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
                 appendChatMsg("NovaRE AI", data.response);
                 document.getElementById('status-text').innerText = "Response completed.";
             })
-            .catch(err => {
+            .catch(function(err) {
                 appendChatMsg("System", "Error communicating with Groq API.");
             });
         }
@@ -444,22 +437,66 @@ HTML_TEMPLATE = """
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ blocks: currentBlocks })
             })
-            .then(res => res.json())
-            .then(data => {
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
                 appendChatMsg("NovaRE AI", data.response);
                 document.getElementById('status-text').innerText = "Audit completed.";
             })
-            .catch(err => {
+            .catch(function(err) {
                 appendChatMsg("System", "Error performing static audit.");
             });
         }
-
-        // Initialize with default welcome mock blocks
-        renderGraph(MOCK_BLOCKS);
     </script>
 </body>
 </html>
 """
+
+# Mock/Welcome Data for initialization
+MOCK_BLOCKS = [
+    {
+        "id": 0,
+        "title": "Main Entry (0x00401000)",
+        "instructions": [
+            (0x00401000, "push", "rbp"),
+            (0x00401001, "mov", "rbp, rsp"),
+            (0x00401004, "sub", "rsp, 0x20"),
+            (0x00401008, "mov", "dword ptr [rbp-4], 0"),
+            (0x0040100F, "jmp", "0x00401020")
+        ],
+        "next_blocks": [(1, "unconditional")]
+    },
+    {
+        "id": 1,
+        "title": "Loop Check (0x00401020)",
+        "instructions": [
+            (0x00401020, "cmp", "dword ptr [rbp-4], 10"),
+            (0x00401024, "jge", "0x00401036")
+        ],
+        "next_blocks": [(3, "true"), (2, "false")]
+    },
+    {
+        "id": 2,
+        "title": "Loop Body (0x00401026)",
+        "instructions": [
+            (0x00401026, "mov", "eax, dword ptr [rbp-4]"),
+            (0x00401029, "add", "eax, 1"),
+            (0x0040102C, "mov", "dword ptr [rbp-4], eax"),
+            (0x0040102F, "jmp", "0x00401020")
+        ],
+        "next_blocks": [(1, "unconditional")]
+    },
+    {
+        "id": 3,
+        "title": "Exit Function (0x00401036)",
+        "instructions": [
+            (0x00401036, "xor", "eax, eax"),
+            (0x00401038, "add", "rsp, 0x20"),
+            (0x0040103C, "pop", "rbp"),
+            (0x0040103D, "ret", "")
+        ],
+        "next_blocks": []
+    }
+]
 
 @app.route('/')
 def home():
@@ -541,33 +578,4 @@ def api_upload():
         if mnem in ['jmp', 'ret']:
             blocks[i]["next_blocks"].append((i + 1, "unconditional"))
         elif mnem in ['je', 'jne', 'jz', 'jnz', 'jg', 'jge', 'jl', 'jle']:
-            blocks[i]["next_blocks"].append((i + 2 if (i + 2) < len(blocks) else i, "true"))
-            blocks[i]["next_blocks"].append((i + 1, "false"))
-        else:
-            blocks[i]["next_blocks"].append((i + 1, "fallthrough"))
-
-    return jsonify({"blocks": blocks})
-
-@app.route('/api/chat', methods=['POST'])
-def api_chat():
-    data = request.json or {}
-    message = data.get('message', '')
-    blocks = data.get('blocks', [])
-
-    context = "Disassembled context available for inspection:\n"
-    for b in blocks:
-        context += f"## {b['title']}\n"
-        for addr, mnem, op in b['instructions']:
-            context += f"0x{addr:08X}: {mnem} {op}\n"
-        context += "\n"
-
-    system_instruction = "You are NovaRE, a sovereign AI Reverse Engineering assistant. Answer users technical questions, explain blocks, variables, stack frames, decryption loops, and overall logic accurately in Turkish."
-
-    try:
-        client = Groq(api_key=GROQ_API_KEY)
-        completion = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "system", "content": context},
-                {"role": "user
+            blocks[i]["next_blocks"].appe
