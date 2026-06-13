@@ -26,9 +26,8 @@ jobs:
 
     - name: Compile and Bundle Code using PyInstaller
       run: |
-        # Not: Eğer PyQt6 kullanmaya devam etmek isterseniz, 
-        # aşağıdaki parametreyi '--collect-all PyQt6' olarak değiştirebilirsiniz.
-        pyinstaller --noconsole --onefile --collect-all PyQt5 --name="NovaRE_AI" main.py
+        # pyinstaller komutundan collect-all parametreleri kaldırıldı çünkü Tkinter yerleşiktir.
+        pyinstaller --noconsole --onefile --name="NovaRE_AI" main.py
 
     - name: Archive Executable Build Artifacts
       uses: actions/upload-artifact@v4
