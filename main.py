@@ -1,443 +1,573 @@
 import sys
 import os
 import pefile
+import webbrowser
+import threading
 from capstone import *
 from groq import Groq
-import customtkinter as ctk
-import tkinter as tk
-from tkinter import filedialog, messagebox
-import threading
+from flask import Flask, request, jsonify, render_template_string
 
 # Groq API Configuration
 GROQ_API_KEY = "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"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# CustomTkinter Theme configuration
-ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("green")
+app = Flask(__name__)
 
-# Mock/Welcome Data for initialization
-MOCK_BLOCKS = [
-    {
-        "id": 0,
-        "title": "Main Entry (0x00401000)",
-        "instructions": [
-            (0x00401000, "push", "rbp"),
-            (0x00401001, "mov", "rbp, rsp"),
-            (0x00401004, "sub", "rsp, 0x20"),
-            (0x00401008, "mov", "dword ptr [rbp-4], 0"),
-            (0x0040100F, "jmp", "0x00401020")
-        ],
-        "next_blocks": [(1, "unconditional")]
-    },
-    {
-        "id": 1,
-        "title": "Loop Check (0x00401020)",
-        "instructions": [
-            (0x00401020, "cmp", "dword ptr [rbp-4], 10"),
-            (0x00401024, "jge", "0x00401036")
-        ],
-        "next_blocks": [(3, "true"), (2, "false")]
-    },
-    {
-        "id": 2,
-        "title": "Loop Body (0x00401026)",
-        "instructions": [
-            (0x00401026, "mov", "eax, dword ptr [rbp-4]"),
-            (0x00401029, "add", "eax, 1"),
-            (0x0040102C, "mov", "dword ptr [rbp-4], eax"),
-            (0x0040102F, "jmp", "0x00401020")
-        ],
-        "next_blocks": [(1, "unconditional")]
-    },
-    {
-        "id": 3,
-        "title": "Exit Function (0x00401036)",
-        "instructions": [
-            (0x00401036, "xor", "eax, eax"),
-            (0x00401038, "add", "rsp, 0x20"),
-            (0x0040103C, "pop", "rbp"),
-            (0x0040103D, "ret", "")
-        ],
-        "next_blocks": []
-    }
-]
+# Embedded Cyberpunk HTML/CSS/JS Template
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaRE AI - Web Static Analyzer</title>
+    <style>
+        :root {
+            --bg-color: #0B0D11;
+            --pane-color: #161920;
+            --border-color: #2D313E;
+            --text-color: #E2E8F0;
+            --accent-green: #22C55E;
+            --accent-red: #EF4444;
+            --accent-blue: #3B82F6;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Consolas', monospace;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            background-color: var(--pane-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            font-size: 16px;
+            color: var(--accent-green);
+        }
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        /* Sidebar Left */
+        .sidebar-left {
+            width: 280px;
+            background-color: var(--pane-color);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        .panel-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #8F93A2;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .file-upload-box {
+            border: 1px dashed var(--accent-green);
+            padding: 15px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .file-upload-box input {
+            display: none;
+        }
+        .file-label {
+            font-size: 11px;
+            color: var(--text-color);
+            word-break: break-all;
+        }
+        select {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 20px;
+            outline: none;
+            font-family: inherit;
+        }
+        .block-list {
+            flex: 1;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            border-radius: 4px;
+            overflow-y: auto;
+            list-style: none;
+        }
+        .block-list li {
+            padding: 8px 12px;
+            font-size: 12px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .block-list li:hover {
+            background-color: #1B2130;
+            color: var(--accent-green);
+        }
+        /* Center Graph View */
+        .center-graph {
+            flex: 1;
+            overflow: auto;
+            background-color: var(--bg-color);
+            position: relative;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .node-card {
+            background-color: var(--pane-color);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            width: 320px;
+            margin-bottom: 40px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .node-header {
+            background-color: #202530;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--accent-green);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .node-body {
+            padding: 10px;
+            font-size: 11px;
+            white-space: pre-line;
+            line-height: 1.5;
+        }
+        .flow-indicator {
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: -35px;
+            margin-bottom: 15px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .flow-true { color: var(--accent-green); }
+        .flow-false { color: var(--accent-red); }
+        .flow-unconditional { color: var(--accent-blue); }
 
-class NovaREAppCustomTk:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("NovaRE AI - Premium CustomTkinter Static Analyzer")
-        # Geometri tanımı 'x' karakteri ile düzeltildi
-        self.root.geometry("1300x780")
+        /* Sidebar Right - AI Chat */
+        .sidebar-right {
+            width: 380px;
+            background-color: var(--pane-color);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        .chat-area {
+            flex: 1;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .chat-msg {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1F2430;
+        }
+        .msg-role-User { color: var(--accent-green); font-weight: bold; }
+        .msg-role-AI { color: var(--accent-blue); font-weight: bold; }
+        .msg-role-System { color: #8F93A2; font-weight: bold; }
         
-        # States
-        self.current_blocks = MOCK_BLOCKS
-        self.current_file_path = ""
-        self.chat_history = []
-        
-        # Color definitions for Vector drawing
-        self.bg_color = "#0B0D11"
-        self.pane_color = "#161920"
-        self.border_color = "#2D313E"
-        self.text_color = "#E2E8F0"
-        self.accent_green = "#22C55E"
-        self.accent_red = "#EF4444"
-        self.accent_blue = "#3B82F6"
-        
-        self.setup_menu()
-        self.build_ui()
-        self.draw_graph()
+        .chat-input-box {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .chat-input-box input {
+            flex: 1;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: #FFFFFF;
+            padding: 8px;
+            border-radius: 4px;
+            outline: none;
+            font-family: inherit;
+        }
+        .chat-input-box button {
+            background-color: #161A26;
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 5px;
+            font-family: inherit;
+            font-weight: bold;
+        }
+        .chat-input-box button:hover {
+            background-color: var(--accent-green);
+            color: var(--bg-color);
+        }
+        .audit-btn {
+            background-color: #10B981;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            width: 100%;
+        }
+        .audit-btn:hover {
+            background-color: #059669;
+        }
+        footer {
+            background-color: var(--pane-color);
+            border-top: 1px solid var(--border-color);
+            padding: 6px 20px;
+            font-size: 11px;
+            color: #8F93A2;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>NovaRE AI - Web Binary Static Analyzer</h1>
+        <div id="status-text" style="font-size: 11px; color:#8F93A2;">Engine Ready</div>
+    </header>
 
-    def setup_menu(self):
-        menubar = tk.Menu(self.root, bg=self.pane_color, fg=self.text_color, activebackground=self.border_color)
-        
-        file_menu = tk.Menu(menubar, tearoff=0, bg=self.pane_color, fg=self.text_color)
-        file_menu.add_command(label="Open Binary Target File", command=self.select_file)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
-        menubar.add_cascade(label="File", menu=file_menu)
-        
-        analysis_menu = tk.Menu(menubar, tearoff=0, bg=self.pane_color, fg=self.text_color)
-        analysis_menu.add_command(label="Refresh Flow-Chart View", command=self.draw_graph)
-        menubar.add_cascade(label="Analysis", menu=analysis_menu)
-        
-        ai_menu = tk.Menu(menubar, tearoff=0, bg=self.pane_color, fg=self.text_color)
-        ai_menu.add_command(label="Generate Comprehensive AI Report", command=self.run_ai_audit)
-        menubar.add_cascade(label="AI Tools", menu=ai_menu)
-        
-        self.root.config(menu=menubar)
+    <div class="main-container">
+        <!-- Left Side -->
+        <div class="sidebar-left">
+            <div class="panel-title">Target Analysis File</div>
+            <div class="file-upload-box" onclick="document.getElementById('file-input').click()">
+                <span class="file-label" id="file-label-text">Click to Select Binary</span>
+                <input type="file" id="file-input" onchange="uploadFile()">
+            </div>
 
-    def build_ui(self):
-        # Configure Grid Layout
-        self.root.columnconfigure(0, weight=1, minsize=260)
-        self.root.columnconfigure(1, weight=3, minsize=550)
-        self.root.columnconfigure(2, weight=2, minsize=370)
-        self.root.rowconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=0)
+            <div class="panel-title">Analysis Depth</div>
+            <select id="depth-select">
+                <option value="1 KB">1 KB (Recommended)</option>
+                <option value="4 KB">4 KB (Medium)</option>
+                <option value="16 KB">16 KB (Deep)</option>
+            </select>
 
-        # LEFT PANEL
-        left_pane = ctk.CTkFrame(self.root, fg_color=self.pane_color, corner_radius=10, border_color=self.border_color, border_width=1)
-        left_pane.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        
-        ctk.CTkLabel(left_pane, text="TARGET ANALYSIS FILE", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(15, 2))
-        self.file_label = ctk.CTkLabel(left_pane, text="No Target Loaded\n(Using Demo Graph)", font=ctk.CTkFont(family="Consolas", size=10), text_color=self.accent_green, justify="left", wraplength=230)
-        self.file_label.pack(anchor="w", padx=15, pady=2)
-        
-        ctk.CTkLabel(left_pane, text="ANALYSIS DEPTH", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(20, 2))
-        self.depth_selector = ctk.CTkComboBox(left_pane, values=["1 KB (Recommended)", "4 KB (Medium)", "16 KB (Deep)"], font=ctk.CTkFont(family="Consolas", size=11))
-        self.depth_selector.set("1 KB (Recommended)")
-        self.depth_selector.pack(fill="x", padx=15, pady=2)
-        
-        ctk.CTkLabel(left_pane, text="EXTRACTED SYMBOL BLOCKS", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(20, 2))
-        
-        self.block_list = tk.Listbox(left_pane, bg=self.bg_color, fg=self.text_color, bd=1, relief="solid", highlightcolor=self.accent_green, selectbackground="#1B2130", selectforeground=self.accent_green, font=("Consolas", 10))
-        self.block_list.pack(fill="both", expand=True, padx=15, pady=10)
-        self.block_list.bind("<<ListboxSelect>>", self.jump_to_block)
+            <div class="panel-title">Extracted Symbol Blocks</div>
+            <ul class="block-list" id="block-list-container">
+                <!-- Blocks loaded dynamically -->
+            </ul>
+        </div>
 
-        # CENTER PANEL
-        center_pane = ctk.CTkFrame(self.root, fg_color=self.bg_color, corner_radius=10, border_color=self.border_color, border_width=1)
-        center_pane.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-        
-        self.canvas = tk.Canvas(center_pane, bg=self.bg_color, bd=0, highlightthickness=0)
-        self.canvas.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        self.canvas.bind("<ButtonPress-1>", self.start_pan)
-        self.canvas.bind("<B1-Motion>", self.pan)
+        <!-- Center Graph Area -->
+        <div class="center-graph" id="graph-view-container">
+            <!-- Dynamic CFG Nodes -->
+        </div>
 
-        # RIGHT PANEL
-        right_pane = ctk.CTkFrame(self.root, fg_color=self.pane_color, corner_radius=10, border_color=self.border_color, border_width=1)
-        right_pane.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
-        
-        ctk.CTkLabel(right_pane, text="NOVARE LLAMA-3.3 INTELLIGENT AI", font=ctk.CTkFont(family="Consolas", size=12, weight="bold"), text_color=self.accent_blue).pack(anchor="w", padx=15, pady=(15, 5))
-        
-        self.chat_area = ctk.CTkTextbox(right_pane, fg_color=self.bg_color, font=ctk.CTkFont(family="Consolas", size=11), text_color=self.text_color, border_color=self.border_color, border_width=1, wrap="word")
-        self.chat_area.pack(fill="both", expand=True, padx=15, pady=5)
-        self.chat_area.insert(tk.END, "Welcome to NovaRE CustomTkinter Edition!\nAsk me anything about binary engineering or click Deep Audit below.\n\n")
-        self.chat_area.configure(state="disabled")
-        
-        chat_input_frame = ctk.CTkFrame(right_pane, fg_color="transparent")
-        chat_input_frame.pack(fill="x", padx=15, pady=10)
-        
-        self.chat_input = ctk.CTkEntry(chat_input_frame, placeholder_text="Ask logic explanation...", font=ctk.CTkFont(family="Consolas", size=11), fg_color=self.bg_color, border_color=self.border_color)
-        self.chat_input.pack(side="left", fill="x", expand=True, ipady=3)
-        self.chat_input.bind("<Return>", lambda e: self.send_chat_message())
-        
-        send_btn = ctk.CTkButton(chat_input_frame, text="Send", width=70, font=ctk.CTkFont(family="Consolas", size=11, weight="bold"), command=self.send_chat_message)
-        send_btn.pack(side="right", padx=(8, 0))
-        
-        self.audit_btn = ctk.CTkButton(right_pane, text="🚀 Run Deep Cyber Audit (AI)", font=ctk.CTkFont(family="Consolas", size=11, weight="bold"), fg_color="#10B981", hover_color="#059669", text_color="#FFFFFF", command=self.run_ai_audit)
-        self.audit_btn.pack(fill="x", padx=15, pady=(0, 15))
+        <!-- Right AI Chat Panel -->
+        <div class="sidebar-right">
+            <div class="panel-title" style="color: var(--accent-blue);">AI Conversation Portal</div>
+            <div class="chat-area" id="chat-box">
+                <div class="chat-msg">
+                    <span class="msg-role-System">System:</span> Welcome to NovaRE Web Engine. Upload a target to inspect decompiled execution.
+                </div>
+            </div>
+            <div class="chat-input-box">
+                <input type="text" id="chat-input" placeholder="Ask AI about logic flow..." onkeydown="if(event.key === 'Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()">Send</button>
+            </div>
+            <button class="audit-btn" onclick="runAiAudit()">🚀 Run Deep Cyber Audit</button>
+        </div>
+    </div>
 
-        # STATUS BAR
-        self.status_label = ctk.CTkLabel(self.root, text="Engine Idle. Ready to parse x86_64 target files.", font=ctk.CTkFont(family="Consolas", size=10), text_color="#8F93A2", fg_color=self.pane_color, anchor="w")
-        self.status_label.grid(row=1, column=0, columnspan=3, sticky="we", ipady=4)
+    <footer>
+        Local Server Connection Status: Connected (127.0.0.1:5000)
+    </footer>
 
-    def start_pan(self, event):
-        self.canvas.scan_mark(event.x, event.y)
+    <script>
+        let currentBlocks = [];
 
-    def pan(self, event):
-        self.canvas.scan_dragto(event.x, event.y, gain=1)
+        function uploadFile() {
+            const fileInput = document.getElementById('file-input');
+            const depth = document.getElementById('depth-select').value;
+            const file = fileInput.files[0];
+            if (!file) return;
 
-    def select_file(self):
-        file_path = filedialog.askopenfilename(title="Open Executable File")
-        if file_path:
-            self.current_file_path = file_path
-            self.file_label.configure(text=os.path.basename(file_path))
-            self.update_status(f"Disassembling {file_path}...")
+            document.getElementById('file-label-text').innerText = file.name;
+            document.getElementById('status-text').innerText = "Disassembling " + file.name + "...";
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('depth', depth);
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    document.getElementById('status-text').innerText = "Decompilation failed.";
+                } else {
+                    currentBlocks = data.blocks;
+                    renderGraph(data.blocks);
+                    document.getElementById('status-text').innerText = "Successfully parsed blocks.";
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('status-text').innerText = "Network upload error.";
+            });
+        }
+
+        function renderGraph(blocks) {
+            const listContainer = document.getElementById('block-list-container');
+            const graphContainer = document.getElementById('graph-view-container');
+            listContainer.innerHTML = "";
+            graphContainer.innerHTML = "";
+
+            blocks.forEach((block, idx) => {
+                // List item left sidebar
+                const li = document.createElement('li');
+                li.innerText = block.title;
+                li.onclick = () => {
+                    document.getElementById(`node-card-${block.id}`).scrollIntoView({ behavior: 'smooth' });
+                };
+                listContainer.appendChild(li);
+
+                // Connector Indicators above block if not the first node
+                if (idx > 0) {
+                    const prevBlock = blocks[idx - 1];
+                    let linkType = "fallthrough";
+                    prevBlock.next_blocks.forEach(link => {
+                        if (link[0] === block.id) {
+                            linkType = link[1];
+                        }
+                    });
+
+                    const flowDiv = document.createElement('div');
+                    flowDiv.className = `flow-indicator flow-${linkType}`;
+                    flowDiv.innerText = `▼ Link: [${linkType.toUpperCase()}]`;
+                    graphContainer.appendChild(flowDiv);
+                }
+
+                // Render block card
+                const card = document.createElement('div');
+                card.className = "node-card";
+                card.id = `node-card-${block.id}`;
+
+                const header = document.createElement('div');
+                header.className = "node-header";
+                header.innerText = block.title;
+                card.appendChild(header);
+
+                const body = document.createElement('div');
+                body.className = "node-body";
+                
+                let instText = "";
+                block.instructions.forEach(inst => {
+                    instText += `0x${inst[0].toString(16).toUpperCase()}:  ${inst[1].padEnd(8, ' ')} ${inst[2]}\\n`;
+                });
+                body.innerText = instText;
+                card.appendChild(body);
+
+                graphContainer.appendChild(card);
+            });
+        }
+
+        function appendChatMsg(sender, text) {
+            const chatBox = document.getElementById('chat-box');
+            const roleClass = sender === "User" ? "msg-role-User" : (sender === "NovaRE AI" ? "msg-role-AI" : "msg-role-System");
             
-            try:
-                self.parse_and_disassemble(file_path)
-                self.update_status(f"Successfully disassembled {os.path.basename(file_path)}")
-            except Exception as e:
-                messagebox.showerror("Disassembler Error", f"Failed to parse binary structure: {str(e)}")
-                self.update_status("Decompilation aborted.")
+            const msgDiv = document.createElement('div');
+            msgDiv.className = "chat-msg";
+            msgDiv.innerHTML = `<span class="${roleClass}">${sender}:</span> ${text.replace(/\\n/g, '<br>')}`;
+            
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
 
-    def parse_and_disassemble(self, file_path):
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            input.value = "";
+            appendChatMsg("User", message);
+            document.getElementById('status-text').innerText = "AI is thinking...";
+
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, blocks: currentBlocks })
+            })
+            .then(res => res.json())
+            .then(data => {
+                appendChatMsg("NovaRE AI", data.response);
+                document.getElementById('status-text').innerText = "Response completed.";
+            })
+            .catch(err => {
+                appendChatMsg("System", "Error communicating with Groq API.");
+            });
+        }
+
+        function runAiAudit() {
+            appendChatMsg("System", "Initializing deep cyber static audit report...");
+            document.getElementById('status-text').innerText = "Running deep static audit...";
+
+            fetch('/api/audit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blocks: currentBlocks })
+            })
+            .then(res => res.json())
+            .then(data => {
+                appendChatMsg("NovaRE AI", data.response);
+                document.getElementById('status-text').innerText = "Audit completed.";
+            })
+            .catch(err => {
+                appendChatMsg("System", "Error performing static audit.");
+            });
+        }
+
+        // Initialize with default welcome mock blocks
+        renderGraph(MOCK_BLOCKS);
+    </script>
+</body>
+</html>
+"""
+
+@app.route('/')
+def home():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file stream"}), 400
+    
+    file = request.files['file']
+    depth_str = request.form.get('depth', '1 KB')
+    
+    try:
+        file_bytes = file.read()
+    except Exception as e:
+        return jsonify({"error": f"Read failed: {str(e)}"}), 500
+
+    entry_offset = 0
+    try:
+        pe = pefile.PE(data=file_bytes)
+        entry_offset = pe.OPTIONAL_HEADER.AddressOfEntryPoint
+        for section in pe.sections:
+            if section.VirtualAddress <= entry_offset < section.VirtualAddress + section.Misc_VirtualSize:
+                entry_offset = section.PointerToRawData + (entry_offset - section.VirtualAddress)
+                break
+    except Exception:
         entry_offset = 0
-        try:
-            pe = pefile.PE(file_path)
-            entry_offset = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-            for section in pe.sections:
-                if section.VirtualAddress <= entry_offset < section.VirtualAddress + section.Misc_VirtualSize:
-                    entry_offset = section.PointerToRawData + (entry_offset - section.VirtualAddress)
-                    break
-        except Exception:
-            entry_offset = 0
 
-        depth_map = {"1 KB (Recommended)": 1024, "4 KB (Medium)": 4096, "16 KB (Deep)": 16384}
-        chunk_size = depth_map.get(self.depth_selector.get(), 1024)
-        
-        with open(file_path, 'rb') as f:
-            f.seek(entry_offset)
-            raw_bytes = f.read(chunk_size)
+    depth_map = {"1 KB": 1024, "4 KB": 4096, "16 KB": 16384}
+    chunk_size = depth_map.get(depth_str, 1024)
+    raw_chunk = file_bytes[entry_offset:entry_offset + chunk_size]
 
-        md = Cs(CS_ARCH_X86, CS_MODE_64)
-        instructions = list(md.disasm(raw_bytes, entry_offset))
+    # Assembly Decompilation via Capstone
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    instructions = list(md.disasm(raw_chunk, entry_offset))
 
-        if not instructions:
-            raise ValueError("No valid x86/x64 instructions extracted from file.")
+    if not instructions:
+        # Fallback to standard 32-bit if x64 is empty
+        md = Cs(CS_ARCH_X86, CS_MODE_32)
+        instructions = list(md.disasm(raw_chunk, entry_offset))
 
-        blocks = []
-        current_list = []
-        block_idx = 0
+    if not instructions:
+        return jsonify({"error": "Empty or unrecognized instruction sequence"}), 400
 
-        for inst in instructions:
-            current_list.append((inst.address, inst.mnemonic, inst.op_str))
-            
-            is_control_flow = inst.mnemonic in [
-                'jmp', 'je', 'jne', 'jz', 'jnz', 'jg', 'jge', 'jl', 'jle', 
-                'call', 'ret', 'loop', 'js', 'jns', 'jo', 'jno', 'jb', 'ja'
-            ]
-            
-            if is_control_flow or len(current_list) >= 12:
-                blocks.append({
-                    "id": block_idx,
-                    "title": f"Block_{block_idx:02d} (0x{current_list[0][0]:X})",
-                    "instructions": current_list,
-                    "next_blocks": []
-                })
-                current_list = []
-                block_idx += 1
+    blocks = []
+    current_list = []
+    block_idx = 0
 
-        if current_list:
+    for inst in instructions:
+        current_list.append((inst.address, inst.mnemonic, inst.op_str))
+        is_control_flow = inst.mnemonic in [
+            'jmp', 'je', 'jne', 'jz', 'jnz', 'jg', 'jge', 'jl', 'jle', 
+            'call', 'ret', 'loop', 'js', 'jns', 'jo', 'jno', 'jb', 'ja'
+        ]
+        if is_control_flow or len(current_list) >= 12:
             blocks.append({
                 "id": block_idx,
                 "title": f"Block_{block_idx:02d} (0x{current_list[0][0]:X})",
                 "instructions": current_list,
                 "next_blocks": []
             })
+            current_list = []
+            block_idx += 1
 
-        for i in range(len(blocks) - 1):
-            last_op = blocks[i]["instructions"][-1]
-            mnem = last_op[1]
-            op = last_op[2]
-            
-            if mnem in ['jmp', 'ret']:
-                target_val = self.parse_operand_address(op)
-                linked = False
-                if target_val:
-                    for t_idx, b in enumerate(blocks):
-                        if b["instructions"] and b["instructions"][0][0] == target_val:
-                            blocks[i]["next_blocks"].append((t_idx, "unconditional"))
-                            linked = True
-                            break
-                if not linked and mnem != 'ret':
-                    blocks[i]["next_blocks"].append((i + 1, "unconditional"))
-            
-            elif mnem in ['je', 'jne', 'jz', 'jnz', 'jg', 'jge', 'jl', 'jle']:
-                target_val = self.parse_operand_address(op)
-                linked = False
-                if target_val:
-                    for t_idx, b in enumerate(blocks):
-                        if b["instructions"] and b["instructions"][0][0] == target_val:
-                            blocks[i]["next_blocks"].append((t_idx, "true"))
-                            linked = True
-                            break
-                if not linked:
-                    mock_idx = (i + 2) if (i + 2) < len(blocks) else i
-                    blocks[i]["next_blocks"].append((mock_idx, "true"))
-                
-                blocks[i]["next_blocks"].append((i + 1, "false"))
-            else:
-                blocks[i]["next_blocks"].append((i + 1, "fallthrough"))
+    if current_list:
+        blocks.append({
+            "id": block_idx,
+            "title": f"Block_{block_idx:02d} (0x{current_list[0][0]:X})",
+            "instructions": current_list,
+            "next_blocks": []
+        })
 
-        self.current_blocks = blocks
-        self.draw_graph()
-
-    def parse_operand_address(self, op_str):
-        try:
-            if op_str.startswith("0x"):
-                return int(op_str, 16)
-            return int(op_str)
-        except ValueError:
-            return None
-
-    def draw_graph(self):
-        self.canvas.delete("all")
-        self.block_list.delete(0, tk.END)
+    for i in range(len(blocks) - 1):
+        last_op = blocks[i]["instructions"][-1]
+        mnem = last_op[1]
+        op = last_op[2]
         
-        if not self.current_blocks:
-            return
+        if mnem in ['jmp', 'ret']:
+            blocks[i]["next_blocks"].append((i + 1, "unconditional"))
+        elif mnem in ['je', 'jne', 'jz', 'jnz', 'jg', 'jge', 'jl', 'jle']:
+            blocks[i]["next_blocks"].append((i + 2 if (i + 2) < len(blocks) else i, "true"))
+            blocks[i]["next_blocks"].append((i + 1, "false"))
+        else:
+            blocks[i]["next_blocks"].append((i + 1, "fallthrough"))
 
-        levels = {}
-        def compute_depth(node_id, current_level, visited):
-            if node_id in visited:
-                return
-            visited.add(node_id)
-            levels[node_id] = max(levels.get(node_id, 0), current_level)
-            for target_id, _ in self.current_blocks[node_id]["next_blocks"]:
-                compute_depth(target_id, current_level + 1, visited.copy())
+    return jsonify({"blocks": blocks})
 
-        compute_depth(0, 0, set())
+@app.route('/api/chat', methods=['POST'])
+def api_chat():
+    data = request.json or {}
+    message = data.get('message', '')
+    blocks = data.get('blocks', [])
 
-        level_groups = {}
-        for b_id in range(len(self.current_blocks)):
-            lvl = levels.get(b_id, 0)
-            level_groups.setdefault(lvl, []).append(b_id)
+    context = "Disassembled context available for inspection:\n"
+    for b in blocks:
+        context += f"## {b['title']}\n"
+        for addr, mnem, op in b['instructions']:
+            context += f"0x{addr:08X}: {mnem} {op}\n"
+        context += "\n"
 
-        pos_map = {}
-        node_width = 280
-        gap_x = 60
-        gap_y = 180
+    system_instruction = "You are NovaRE, a sovereign AI Reverse Engineering assistant. Answer users technical questions, explain blocks, variables, stack frames, decryption loops, and overall logic accurately in Turkish."
 
-        for lvl, b_ids in level_groups.items():
-            count = len(b_ids)
-            total_w = count * node_width + (count - 1) * gap_x
-            offset_x = 400 - (total_w / 2)
-            
-            for idx, b_id in enumerate(b_ids):
-                x = offset_x + idx * (node_width + gap_x)
-                y = 40 + lvl * gap_y
-                pos_map[b_id] = (x, y)
-
-        self.block_coords = {}
-        
-        for b in self.current_blocks:
-            b_id = b["id"]
-            x, y = pos_map[b_id]
-            
-            self.block_list.insert(tk.END, b["title"])
-            
-            text_lines = [b["title"]]
-            for addr, mnem, op in b["instructions"]:
-                text_lines.append(f"0x{addr:08X}: {mnem} {op}")
-            
-            node_height = len(text_lines) * 16 + 20
-            self.block_coords[b_id] = (x, y, node_width, node_height)
-            
-            self.draw_rounded_rect(x, y, x + node_width, y + node_height, 8, fill="#161920", outline=self.border_color, width=2, tags=f"node_{b_id}")
-            self.draw_rounded_rect(x + 2, y + 2, x + node_width - 2, y + 22, 6, fill="#202530", outline="", tags=f"node_{b_id}")
-            
-            self.canvas.create_text(x + 12, y + 12, text=b["title"], fill=self.accent_green, font=("Consolas", 10, "bold"), anchor="w")
-            
-            line_y = y + 36
-            for addr, mnem, op in b["instructions"]:
-                inst_text = f"0x{addr:08X}  {mnem:<6} {op}"
-                self.canvas.create_text(x + 12, line_y, text=inst_text, fill=self.text_color, font=("Consolas", 9), anchor="w")
-                line_y += 16
-
-        for b in self.current_blocks:
-            b_id = b["id"]
-            if b_id not in self.block_coords:
-                continue
-            x1, y1, w1, h1 = self.block_coords[b_id]
-            start_pt = (x1 + w1 / 2, y1 + h1)
-            
-            for target_id, link_type in b["next_blocks"]:
-                if target_id in self.block_coords:
-                    x2, y2, w2, h2 = self.block_coords[target_id]
-                    end_pt = (x2 + w2 / 2, y2)
-                    
-                    color = "#5C6370"
-                    if link_type == "true":
-                        color = self.accent_green
-                    elif link_type == "false":
-                        color = self.accent_red
-                    elif link_type == "unconditional":
-                        color = self.accent_blue
-                    
-                    self.canvas.create_line(start_pt[0], start_pt[1], end_pt[0], end_pt[1], fill=color, width=2, arrow=tk.LAST, smooth=True)
-
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
-
-    def draw_rounded_rect(self, x1, y1, x2, y2, r, **kwargs):
-        points = [
-            x1+r, y1, x1+r, y1, x2-r, y1, x2-r, y1, x2, y1, x2, y1+r, x2, y1+r,
-            x2, y2-r, x2, y2-r, x2, y2, x2-r, y2, x2-r, y2, x1+r, y2, x1+r, y2,
-            x1, y2, x1, y2-r, x1, y2-r, x1, y1+r, x1, y1+r, x1, y1
-        ]
-        return self.canvas.create_polygon(points, **kwargs, smooth=True)
-
-    def jump_to_block(self, event):
-        selection = self.block_list.curselection()
-        if selection:
-            idx = selection[0]
-            title = self.block_list.get(idx)
-            for b_id, b in enumerate(self.current_blocks):
-                if b["title"] == title:
-                    x, y, w, h = self.block_coords[b_id]
-                    self.canvas.xview_moveto((x - 100) / self.canvas.winfo_width())
-                    self.canvas.yview_moveto((y - 100) / self.canvas.winfo_height())
-                    
-                    self.canvas.itemconfig(f"node_{b_id}", outline=self.accent_green)
-                    for other_id in range(len(self.current_blocks)):
-                        if other_id != b_id:
-                            self.canvas.itemconfig(f"node_{other_id}", outline=self.border_color)
-                    break
-
-    def build_ai_context(self):
-        context = "Current Code Control-Flow Architecture:\n"
-        for b in self.current_blocks:
-            context += f"## {b['title']}\n"
-            for addr, mnem, op in b['instructions']:
-                context += f"0x{addr:08X}: {mnem} {op}\n"
-            context += f"Connections: {b['next_blocks']}\n\n"
-        return context
-
-    def send_chat_message(self):
-        user_msg = self.chat_input.get().strip()
-        if not user_msg:
-            return
-        
-        self.chat_input.delete(0, tk.END)
-        self.append_chat("User", user_msg)
-        self.update_status("AI is processing disassembly context and query...")
-
-        # Hata veren çok satırlı tırnak yapısı tamamen tek satırlı hale getirilerek düzeltildi
-        system_instruction = "You are NovaRE, a sovereign AI Reverse Engineering assistant. You have direct system telemetry access to the decompiled basic blocks control flow graph (CFG). Answer users technical questions, explain blocks, variables, stack frames, decryption loops, and overall logic accurately. Analyze user request context and keep answers technical, direct, and in Turkish language."
-
-        messages = [
-            {"role": "system", "content": system_instruction},
-            {"role": "system", "content": f"Here is the context of analyzed executable blocks:\n{self.build_ai_context()}"}
-        ]
-
-        for role, text in self.chat_history:
-            messages.append({"role": "user" if role == "User" else "assistant", "content": text})
-        
-        messages.append({"role": "user", "content": user_msg})
-        self.chat_history.append(("User", user_msg))
-
-        threading.Thread(target=self.query_groq, args=(messages,), daemon=True).start()
-
-    def run_ai_audit(self):
-        self.update_status("Runnin
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        completion = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "system", "content": context},
+                {"role": "user
