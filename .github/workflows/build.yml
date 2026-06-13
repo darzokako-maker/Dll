@@ -26,8 +26,8 @@ jobs:
 
     - name: Compile and Bundle Code using PyInstaller
       run: |
-        # pyinstaller komutundan collect-all parametreleri kaldırıldı çünkü Tkinter yerleşiktir.
-        pyinstaller --noconsole --onefile --name="NovaRE_AI" main.py
+        # CustomTkinter'ın tema ve JSON dosyalarını EXE içine eksiksiz gömmek için collect-all ekledik.
+        pyinstaller --noconsole --onefile --collect-all customtkinter --name="NovaRE_AI" main.py
 
     - name: Archive Executable Build Artifacts
       uses: actions/upload-artifact@v4
