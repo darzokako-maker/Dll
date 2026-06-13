@@ -14,7 +14,7 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # CustomTkinter Theme configuration
 ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("green") # Neon Green Matrix/Cyber vibe!
+ctk.set_default_color_theme("green")
 
 # Mock/Welcome Data for initialization
 MOCK_BLOCKS = [
@@ -67,7 +67,8 @@ class NovaREAppCustomTk:
     def __init__(self, root):
         self.root = root
         self.root.title("NovaRE AI - Premium CustomTkinter Static Analyzer")
-        self.root.geometry("1300, 780")
+        # Geometri tanımı 'x' karakteri ile düzeltildi
+        self.root.geometry("1300x780")
         
         # States
         self.current_blocks = MOCK_BLOCKS
@@ -108,13 +109,13 @@ class NovaREAppCustomTk:
 
     def build_ui(self):
         # Configure Grid Layout
-        self.root.columnconfigure(0, weight=1, minsize=260) # Left
-        self.root.columnconfigure(1, weight=3, minsize=550) # Center
-        self.root.columnconfigure(2, weight=2, minsize=370) # Right
+        self.root.columnconfigure(0, weight=1, minsize=260)
+        self.root.columnconfigure(1, weight=3, minsize=550)
+        self.root.columnconfigure(2, weight=2, minsize=370)
         self.root.rowconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=0)
 
-        # LEFT PANEL: Meta info & Block List (CustomTkinter Frame)
+        # LEFT PANEL
         left_pane = ctk.CTkFrame(self.root, fg_color=self.pane_color, corner_radius=10, border_color=self.border_color, border_width=1)
         left_pane.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
@@ -129,29 +130,26 @@ class NovaREAppCustomTk:
         
         ctk.CTkLabel(left_pane, text="EXTRACTED SYMBOL BLOCKS", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"), text_color="#8F93A2").pack(anchor="w", padx=15, pady=(20, 2))
         
-        # Standard Listbox packaged nicely for seamless selection handling
         self.block_list = tk.Listbox(left_pane, bg=self.bg_color, fg=self.text_color, bd=1, relief="solid", highlightcolor=self.accent_green, selectbackground="#1B2130", selectforeground=self.accent_green, font=("Consolas", 10))
         self.block_list.pack(fill="both", expand=True, padx=15, pady=10)
         self.block_list.bind("<<ListboxSelect>>", self.jump_to_block)
 
-        # CENTER PANEL: Canvas (Software-Render Graph View - Winlator Safe)
+        # CENTER PANEL
         center_pane = ctk.CTkFrame(self.root, fg_color=self.bg_color, corner_radius=10, border_color=self.border_color, border_width=1)
         center_pane.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         
         self.canvas = tk.Canvas(center_pane, bg=self.bg_color, bd=0, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # Custom Pan/Drag bindings for mouse/touch translation
         self.canvas.bind("<ButtonPress-1>", self.start_pan)
         self.canvas.bind("<B1-Motion>", self.pan)
 
-        # RIGHT PANEL: AI Conversation Center
+        # RIGHT PANEL
         right_pane = ctk.CTkFrame(self.root, fg_color=self.pane_color, corner_radius=10, border_color=self.border_color, border_width=1)
         right_pane.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
         
         ctk.CTkLabel(right_pane, text="NOVARE LLAMA-3.3 INTELLIGENT AI", font=ctk.CTkFont(family="Consolas", size=12, weight="bold"), text_color=self.accent_blue).pack(anchor="w", padx=15, pady=(15, 5))
         
-        # Rich Text Chat Box
         self.chat_area = ctk.CTkTextbox(right_pane, fg_color=self.bg_color, font=ctk.CTkFont(family="Consolas", size=11), text_color=self.text_color, border_color=self.border_color, border_width=1, wrap="word")
         self.chat_area.pack(fill="both", expand=True, padx=15, pady=5)
         self.chat_area.insert(tk.END, "Welcome to NovaRE CustomTkinter Edition!\nAsk me anything about binary engineering or click Deep Audit below.\n\n")
@@ -334,7 +332,6 @@ class NovaREAppCustomTk:
 
         self.block_coords = {}
         
-        # Render Blocks on Vector Canvas
         for b in self.current_blocks:
             b_id = b["id"]
             x, y = pos_map[b_id]
@@ -348,22 +345,17 @@ class NovaREAppCustomTk:
             node_height = len(text_lines) * 16 + 20
             self.block_coords[b_id] = (x, y, node_width, node_height)
             
-            # Rounded Block outline using canvas polygons
             self.draw_rounded_rect(x, y, x + node_width, y + node_height, 8, fill="#161920", outline=self.border_color, width=2, tags=f"node_{b_id}")
-            # Header block
             self.draw_rounded_rect(x + 2, y + 2, x + node_width - 2, y + 22, 6, fill="#202530", outline="", tags=f"node_{b_id}")
             
-            # Header Text
             self.canvas.create_text(x + 12, y + 12, text=b["title"], fill=self.accent_green, font=("Consolas", 10, "bold"), anchor="w")
             
-            # Instruction print loop
             line_y = y + 36
             for addr, mnem, op in b["instructions"]:
                 inst_text = f"0x{addr:08X}  {mnem:<6} {op}"
                 self.canvas.create_text(x + 12, line_y, text=inst_text, fill=self.text_color, font=("Consolas", 9), anchor="w")
                 line_y += 16
 
-        # Render Flowlines between blocks
         for b in self.current_blocks:
             b_id = b["id"]
             if b_id not in self.block_coords:
@@ -384,12 +376,10 @@ class NovaREAppCustomTk:
                     elif link_type == "unconditional":
                         color = self.accent_blue
                     
-                    # Draw connection line with arrow head pointing to children
                     self.canvas.create_line(start_pt[0], start_pt[1], end_pt[0], end_pt[1], fill=color, width=2, arrow=tk.LAST, smooth=True)
 
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-    # Helper function to render rounded blocks without native Windows API dependencies
     def draw_rounded_rect(self, x1, y1, x2, y2, r, **kwargs):
         points = [
             x1+r, y1, x1+r, y1, x2-r, y1, x2-r, y1, x2, y1, x2, y1+r, x2, y1+r,
@@ -409,7 +399,6 @@ class NovaREAppCustomTk:
                     self.canvas.xview_moveto((x - 100) / self.canvas.winfo_width())
                     self.canvas.yview_moveto((y - 100) / self.canvas.winfo_height())
                     
-                    # Target highlight
                     self.canvas.itemconfig(f"node_{b_id}", outline=self.accent_green)
                     for other_id in range(len(self.current_blocks)):
                         if other_id != b_id:
@@ -434,8 +423,21 @@ class NovaREAppCustomTk:
         self.append_chat("User", user_msg)
         self.update_status("AI is processing disassembly context and query...")
 
-        system_instruction = (
-            "You are NovaRE, a sovereign AI Reverse Engineering assistant. "
-            "You have direct system telemetry access to the decompiled basic blocks control flow graph (CFG). "
-            "Answer users technical questions, explain blocks, variables, stack frames, decryption loops, and overall logic accurately. "
-            "Analyze user request context and keep 
+        # Hata veren çok satırlı tırnak yapısı tamamen tek satırlı hale getirilerek düzeltildi
+        system_instruction = "You are NovaRE, a sovereign AI Reverse Engineering assistant. You have direct system telemetry access to the decompiled basic blocks control flow graph (CFG). Answer users technical questions, explain blocks, variables, stack frames, decryption loops, and overall logic accurately. Analyze user request context and keep answers technical, direct, and in Turkish language."
+
+        messages = [
+            {"role": "system", "content": system_instruction},
+            {"role": "system", "content": f"Here is the context of analyzed executable blocks:\n{self.build_ai_context()}"}
+        ]
+
+        for role, text in self.chat_history:
+            messages.append({"role": "user" if role == "User" else "assistant", "content": text})
+        
+        messages.append({"role": "user", "content": user_msg})
+        self.chat_history.append(("User", user_msg))
+
+        threading.Thread(target=self.query_groq, args=(messages,), daemon=True).start()
+
+    def run_ai_audit(self):
+        self.update_status("Runnin
