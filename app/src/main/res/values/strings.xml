@@ -1,1 +1,3 @@
-<resources><string name="app_name">Chess Coach</string></resources>
+<resources>
+    <string name="app_name">Chess Mentor</string>
+</resources>
