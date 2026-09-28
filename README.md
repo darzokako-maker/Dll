@@ -6,7 +6,7 @@ Türkçe, erişilebilir bir Android satranç analiz yardımcısı. Tahtayı uygu
 
 ## APK oluşturma
 
-GitHub Actions çalışması her push ve pull request için `app-debug.apk` yapıtını üretir. Yerelde:
+GitHub Actions çalışması Java 17 ve Gradle 8.7 ile her push ve pull request için `app-debug.apk` yapıtını üretir. Yerelde:
 
 ```bash
 ./gradlew assembleDebug
